@@ -1,0 +1,46 @@
+name: ECS CI/CD Pipeline
+
+# Trigger workflow on push to main branch
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Configure AWS credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-north-1
+
+      # Step 3: Build Docker image
+      - name: Build Docker image
+        run: |
+          docker build -t my-app:latest .
+          docker tag my-app:latest 159750416379.dkr.ecr.eu-north-1.amazonaws.com/my-app:latest
+
+      # Step 4: Push Docker image to ECR
+      - name: Login to ECR and push
+        run: |
+          aws ecr get-login-password --region eu-north-1 | docker login --username AWS --password-stdin 159750416379.dkr.ecr.eu-north-1.amazonaws.com
+          docker push 159750416379.dkr.ecr.eu-north-1.amazonaws.com/my-app:latest
+
+      # Step 5: Deploy to ECS
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          cluster: my-app1                      # your ECS cluster
+          service: myflaskapp-service-l3indpvn  # your ECS service
+          task-definition: task-def.json
+          wait-for-service-stability: true
+
